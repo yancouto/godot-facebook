@@ -11,6 +11,7 @@
 @import FBSDKCoreKit;
 @import FBSDKLoginKit;
 @import FBSDKShareKit;
+@import FBSDKGamingServicesKit;
 #import <AdSupport/ASIdentifierManager.h>
 #import <CoreTelephony/CTTelephonyNetworkInfo.h>
 #import <CoreTelephony/CTCarrier.h>
@@ -97,7 +98,7 @@ NSDictionary *convertFromDictionary(const Dictionary& dict)
             if(val.get_type() == Variant::INT) {
                 int i = (int)val;
                 result[strKey] = @(i);
-            } else if(val.get_type() == Variant::REAL) {
+            } else if(val.get_type() == Variant::FLOAT) {
                 double d = (double)val;
                 result[strKey] = @(d);
             } else if(val.get_type() == Variant::STRING) {
@@ -155,10 +156,13 @@ void FacebookPlugin::_init()
 {
 }
 
-void FacebookPlugin::init(const String& key) {
+void FacebookPlugin::init(const String& key, const String& clientToken, const String& appName) {
     [[FBSDKApplicationDelegate sharedInstance] application:[UIApplication sharedApplication] didFinishLaunchingWithOptions:nil];
     loginManager = [[FBSDKLoginManager alloc] init];
-    [FBSDKSettings setAppID:[NSString stringWithUTF8String:key.utf8().get_data()]];
+    [FBSDKSettings.sharedSettings setAppID:[NSString stringWithUTF8String:key.utf8().get_data()]];
+    [FBSDKSettings.sharedSettings setClientToken:[NSString stringWithUTF8String:clientToken.utf8().get_data()]];
+    [FBSDKSettings.sharedSettings setDisplayName:[NSString stringWithUTF8String:appName.utf8().get_data()]];
+
 }
 
 void FacebookPlugin::setFacebookCallbackId(Object* facebookcallback) {
@@ -167,15 +171,10 @@ void FacebookPlugin::setFacebookCallbackId(Object* facebookcallback) {
 
 void FacebookPlugin::gameRequest(const String message, const String recipient, const String objectId) {
     
-    FBSDKGameRequestDialog *dialog = [[FBSDKGameRequestDialog alloc] init];
+
     MyGameRequestDialogDelegate *delegate = [[MyGameRequestDialogDelegate alloc] init];
     delegate.callbackOb = fbCallbackObj;
-    dialog.delegate = delegate;
-    if (![dialog canShow]) {
-        ERR_FAIL_COND(!fbCallbackObj);
-        fbCallbackObj->call_deferred("request_failed", String("Cannot show dialog"));
-        return;
-    }
+
         
     FBSDKGameRequestContent *content = [[FBSDKGameRequestContent alloc] init];
         
@@ -189,6 +188,12 @@ void FacebookPlugin::gameRequest(const String message, const String recipient, c
     content.recipients = @[ [NSString stringWithUTF8String:recipient.utf8().get_data()] ];
     //content.title = params[@"title"];
         
+    FBSDKGameRequestDialog *dialog = [[FBSDKGameRequestDialog alloc] initWithContent:content delegate:delegate];
+    if (![dialog canShow]) {
+        ERR_FAIL_COND(!fbCallbackObj);
+        fbCallbackObj->call_deferred("request_failed", String("Cannot show dialog"));
+        return;
+    }
     dialog.content = content;
     [dialog show];
 }
@@ -240,7 +245,7 @@ bool FacebookPlugin::isLoggedIn() {
 void FacebookPlugin::userProfile(Object *callbackOb, const String& callbackMethod) {
     NSString *cbMethod = [NSString stringWithUTF8String:callbackMethod.utf8().get_data()];
     FBSDKGraphRequest *request = [[FBSDKGraphRequest alloc] initWithGraphPath:@"/me" parameters:nil];
-    [request startWithCompletionHandler:^(FBSDKGraphRequestConnection *connection, id result, NSError *error) {
+    [request startWithCompletion:^(id<FBSDKGraphRequestConnecting> connection, id result, NSError *error) {
             dispatch_async(dispatch_get_main_queue(), ^{
                     ERR_FAIL_COND(!callbackOb);
                     String strCbMethod(cbMethod.UTF8String);
@@ -266,7 +271,7 @@ void FacebookPlugin::callApi(const String path, const Dictionary properties, Obj
     NSString *cbMethod = [NSString stringWithUTF8String:callbackMethod.utf8().get_data()];
     NSDictionary *paramsDict = convertFromDictionary(properties);
     FBSDKGraphRequest *request = [[FBSDKGraphRequest alloc] initWithGraphPath:pth parameters:paramsDict];
-    [request startWithCompletionHandler:^(FBSDKGraphRequestConnection *connection, id result, NSError *error) {
+    [request startWithCompletion:^(id<FBSDKGraphRequestConnecting> connection, id result, NSError *error) {
             //dispatch_async(dispatch_get_main_queue(), ^{
                     ERR_FAIL_COND(!callbackOb);
                     String strCbMethod(cbMethod.UTF8String);
@@ -287,29 +292,29 @@ void FacebookPlugin::callApi(const String path, const Dictionary properties, Obj
 
 void FacebookPlugin::pushToken(const String& token) {
     NSData *data = [NSData dataWithBytes:token.utf8().get_data() length:token.utf8().length()];
-    [FBSDKAppEvents setPushNotificationsDeviceToken:data];
+    [FBSDKAppEvents.shared setPushNotificationsDeviceToken:data];
 }
 
 void FacebookPlugin::logEvent(const String& event) {
     NSString *event_name = [NSString stringWithUTF8String:event.utf8().get_data()];
-    [FBSDKAppEvents logEvent:event_name];
+    [FBSDKAppEvents.shared logEvent:event_name];
 }
 
 void FacebookPlugin::logEventValue(const String& event, double value) {
     NSString *event_name = [NSString stringWithUTF8String:event.utf8().get_data()];
-    [FBSDKAppEvents logEvent:event_name valueToSum:value];
+    [FBSDKAppEvents.shared logEvent:event_name valueToSum:value];
 }
 
 void FacebookPlugin::logEventParams(const String& event, const Dictionary params) {
     NSString *event_name = [NSString stringWithUTF8String:event.utf8().get_data()];
     NSDictionary *paramsDict = convertFromDictionary(params);
-    [FBSDKAppEvents logEvent:event_name parameters:paramsDict];
+    [FBSDKAppEvents.shared logEvent:event_name parameters:paramsDict];
 }
 
 void FacebookPlugin::logEventValueParams(const String& event, double value, const Dictionary params) {
     NSString *event_name = [NSString stringWithUTF8String:event.utf8().get_data()];
     NSDictionary *paramsDict = convertFromDictionary(params);
-    [FBSDKAppEvents logEvent:event_name valueToSum:value parameters:paramsDict];
+    [FBSDKAppEvents.shared logEvent:event_name valueToSum:value parameters:paramsDict];
 }
 
 String FacebookPlugin::advertisingID() {
@@ -393,7 +398,7 @@ Array FacebookPlugin::extinfo() {
 void FacebookPlugin::setAdvertiserTracking(bool enabled)
 {
     if (@available(iOS 14, *)) {
-        [FBSDKSettings setAdvertiserTrackingEnabled: enabled];
+        [FBSDKSettings.sharedSettings setAdvertiserTrackingEnabled: enabled];
     }
 }
 

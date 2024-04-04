@@ -1,5 +1,7 @@
 *.o
 *.d
 *.pyc
+*.DS_Store
 ios-framework/build/*
+ios-framework/godot
 ios-framework/gdnative_ios.xcodeproj/project.xcworkspace/xcuserdata

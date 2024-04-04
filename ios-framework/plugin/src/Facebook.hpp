@@ -27,7 +27,7 @@ public:
 
     void _init();
     
-    void init(const String& key);
+    void init(const String& key, const String& clientToken, const String& appName);
     void setFacebookCallbackId(Object* facebookcallback);
     void gameRequest(const String message, const String recipient, const String objectId);
     void login(const Array permissions);
